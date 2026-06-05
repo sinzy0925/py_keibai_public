@@ -20,6 +20,10 @@ on:
         description: 各 Gemini 呼び出し直前の待機（秒）
         type: string
         default: "2"
+      pages_per_call:
+        description: 1 回の Gemini 呼び出しで送るページ数
+        type: string
+        default: "1"
       force:
         description: 既存 transcript があっても再実行
         type: boolean
@@ -96,6 +100,7 @@ jobs:
             --pdf-source "${{ inputs.pdf_source }}"
             --limit "${{ inputs.limit }}"
             --gemini-wait "${{ inputs.gemini_wait }}"
+            --pages-per-call "${{ inputs.pages_per_call }}"
           )
           if [ "${{ inputs.force }}" = "true" ]; then
             ARGS+=(--force)
