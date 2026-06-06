@@ -28,14 +28,14 @@ on:
         description: 特定物件のみ（例 33111_00000062162。空欄ですべて）
         type: string
         default: ""
-      force:
-        description: 既存 transcript があっても全ページ再実行（err-retry と排他）
-        type: boolean
-        default: false
-      err_retry:
-        description: エラーページのみ再実行（--err-retry。partial 回収用）
-        type: boolean
-        default: false
+      run_mode:
+        description: "実行モード: normal=通常 / force=全ページ再実行 / err_retry=エラーページのみ"
+        type: choice
+        options:
+          - normal
+          - force
+          - err_retry
+        default: normal
 
 permissions:
   contents: read
@@ -102,10 +102,6 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
-          if [ "${{ inputs.force }}" = "true" ] && [ "${{ inputs.err_retry }}" = "true" ]; then
-            echo "ERROR: force と err-retry は同時に指定できません"
-            exit 1
-          fi
           ARGS=(
             python pdf_transcribe_gemini.py
             --block 06_kinki
@@ -118,11 +114,15 @@ jobs:
           if [ -n "${PROPERTY_ID}" ]; then
             ARGS+=(--property-id "${PROPERTY_ID}")
           fi
-          if [ "${{ inputs.err_retry }}" = "true" ]; then
-            ARGS+=(--err-retry)
-          elif [ "${{ inputs.force }}" = "true" ]; then
-            ARGS+=(--force)
-          fi
+          case "${{ inputs.run_mode }}" in
+            err_retry) ARGS+=(--err-retry) ;;
+            force) ARGS+=(--force) ;;
+            normal) ;;
+            *)
+              echo "ERROR: unknown run_mode: ${{ inputs.run_mode }}"
+              exit 1
+              ;;
+          esac
           echo "Run: ${ARGS[*]}"
           "${ARGS[@]}"
 
@@ -139,7 +139,7 @@ jobs:
             echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ "${{ inputs.err_retry }}" = "true" ]; then
+          if [ "${{ inputs.run_mode }}" = "err_retry" ]; then
             git commit -m "chore(ci): err-retry Kinki PDF transcripts (Gemini) [skip ci]"
           else
             git commit -m "chore(ci): update Kinki PDF transcripts (Gemini) [skip ci]"
