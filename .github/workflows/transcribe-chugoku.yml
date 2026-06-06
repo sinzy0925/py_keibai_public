@@ -1,4 +1,4 @@
-# public リポ専用: 本体は private sinzy0925/py_keibai を checkout し、成果物も private のみに push
+# public 鏡像用: 本体は private sinzy0925/py_keibai を checkout し、成果物は private のみに push
 name: BIT pdf transcribe gemini (Chugoku)
 
 on:
@@ -24,8 +24,16 @@ on:
         description: 1 回の Gemini 呼び出しで送るページ数
         type: string
         default: "1"
+      property_id:
+        description: 特定物件のみ（例 35111_00000014820。空欄ですべて）
+        type: string
+        default: ""
       force:
-        description: 既存 transcript があっても再実行
+        description: 既存 transcript があっても全ページ再実行（err-retry と排他）
+        type: boolean
+        default: false
+      err_retry:
+        description: エラーページのみ再実行（--err-retry。partial 回収用）
         type: boolean
         default: false
 
@@ -94,6 +102,10 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
+          if [ "${{ inputs.force }}" = "true" ] && [ "${{ inputs.err_retry }}" = "true" ]; then
+            echo "ERROR: force と err-retry は同時に指定できません"
+            exit 1
+          fi
           ARGS=(
             python pdf_transcribe_gemini.py
             --block 07_chugoku
@@ -105,7 +117,13 @@ jobs:
           if [ -n "${LIMIT}" ]; then
             ARGS+=(--limit "${LIMIT}")
           fi
-          if [ "${{ inputs.force }}" = "true" ]; then
+          PROPERTY_ID="${{ inputs.property_id }}"
+          if [ -n "${PROPERTY_ID}" ]; then
+            ARGS+=(--property-id "${PROPERTY_ID}")
+          fi
+          if [ "${{ inputs.err_retry }}" = "true" ]; then
+            ARGS+=(--err-retry)
+          elif [ "${{ inputs.force }}" = "true" ]; then
             ARGS+=(--force)
           fi
           echo "Run: ${ARGS[*]}"
@@ -124,7 +142,11 @@ jobs:
             echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git commit -m "chore(ci): update Chugoku PDF transcripts (Gemini) [skip ci]"
+          if [ "${{ inputs.err_retry }}" = "true" ]; then
+            git commit -m "chore(ci): err-retry Chugoku PDF transcripts (Gemini) [skip ci]"
+          else
+            git commit -m "chore(ci): update Chugoku PDF transcripts (Gemini) [skip ci]"
+          fi
           echo "committed=true" >> "$GITHUB_OUTPUT"
 
       - name: Push to private with rebase
