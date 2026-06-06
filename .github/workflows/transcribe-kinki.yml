@@ -15,7 +15,7 @@ on:
       limit:
         description: 処理する PDF 件数上限
         type: string
-        default: "50"
+        default: "100"
       gemini_wait:
         description: 各 Gemini 呼び出し直前の待機（秒）
         type: string
@@ -23,7 +23,7 @@ on:
       pages_per_call:
         description: 1 回の Gemini 呼び出しで送るページ数
         type: string
-        default: "1"
+        default: "2"
       property_id:
         description: 特定物件のみ（例 33111_00000062162。空欄ですべて）
         type: string
