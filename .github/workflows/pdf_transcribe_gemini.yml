@@ -1,41 +1,55 @@
 # public 鏡像用: 本体は private sinzy0925/py_keibai を checkout し、成果物は private のみに push
-name: BIT pdf transcribe gemini (07_chugoku)
+name: BIT pdf transcribe gemini
 
 on:
   workflow_dispatch:
     inputs:
+      block:
+        description: ブロック
+        type: choice
+        options:
+          - 01_hokkaido
+          - 02_tohoku
+          - 03_kanto
+          - 04_hokuriku
+          - 05_tokai
+          - 06_kinki
+          - 07_chugoku
+          - 08_shikoku
+          - 09_kyushu
+        default: 03_kanto
+      run_mode:
+        description: "実行モード: normal=通常 / err_retry=エラーページのみ / force=全ページ再実行"
+        type: choice
+        options:
+          - normal
+          - err_retry
+          - force
+        default: normal
       pdf_source:
-        description: PDF 取得元
+        description: PDF 取得元（drive / local / auto）
         type: choice
         options:
           - drive
-          - auto
           - local
+          - auto
         default: drive
+      api_key:
+        description: 使用する GOOGLE_API_KEY の番号範囲（例 1-6, 13-18）
+        type: string
+        default: "1-6"
       limit:
-        description: 処理する PDF 件数上限（空欄で無制限）
+        description: 処理する PDF 件数上限
         type: string
         default: "100"
       gemini_wait:
         description: 各 Gemini 呼び出し直前の待機（秒）
         type: string
-        default: "2"
+        default: "4"
       pages_per_call:
         description: 1 回の Gemini 呼び出しで送るページ数
         type: string
-        default: "2"
-      property_id:
-        description: 特定物件のみ（例 35111_00000014820。空欄ですべて）
-        type: string
-        default: ""
-      run_mode:
-        description: "実行モード: normal=通常 / force=全ページ再実行 / err_retry=エラーページのみ"
-        type: choice
-        options:
-          - normal
-          - force
-          - err_retry
-        default: normal
+        default: "4"
 
 permissions:
   contents: read
@@ -98,25 +112,21 @@ jobs:
           printf '%s' "$GOOGLE_DRIVE_TOKEN" > secrets/google_drive_token.json
           printf '%s' "$ENV_FILE" > .env
 
-      - name: Transcribe PDFs (Gemini, Chugoku)
+      - name: Transcribe PDFs (Gemini)
+        id: transcribe
+        continue-on-error: true
         working-directory: app
         run: |
           set -euo pipefail
           ARGS=(
             python pdf_transcribe_gemini.py
-            --block 07_chugoku
+            --block "${{ inputs.block }}"
+            --api-key "${{ inputs.api_key }}"
             --pdf-source "${{ inputs.pdf_source }}"
+            --limit "${{ inputs.limit }}"
             --gemini-wait "${{ inputs.gemini_wait }}"
             --pages-per-call "${{ inputs.pages_per_call }}"
           )
-          LIMIT="${{ inputs.limit }}"
-          if [ -n "${LIMIT}" ]; then
-            ARGS+=(--limit "${LIMIT}")
-          fi
-          PROPERTY_ID="${{ inputs.property_id }}"
-          if [ -n "${PROPERTY_ID}" ]; then
-            ARGS+=(--property-id "${PROPERTY_ID}")
-          fi
           case "${{ inputs.run_mode }}" in
             err_retry) ARGS+=(--err-retry) ;;
             force) ARGS+=(--force) ;;
@@ -134,18 +144,19 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
+          BLOCK="${{ inputs.block }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/blocks/07_chugoku/transcripts/
+          git add "data/blocks/${BLOCK}/transcripts/"
           if git diff --staged --quiet; then
             echo "No transcript changes to commit."
             echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ "${{ inputs.run_mode }}" = "err_retry" ]; then
-            git commit -m "chore(ci): err-retry Chugoku PDF transcripts (Gemini) [skip ci]"
+            git commit -m "chore(ci): err-retry ${BLOCK} PDF transcripts (Gemini) [skip ci]"
           else
-            git commit -m "chore(ci): update Chugoku PDF transcripts (Gemini) [skip ci]"
+            git commit -m "chore(ci): update ${BLOCK} PDF transcripts (Gemini) [skip ci]"
           fi
           echo "committed=true" >> "$GITHUB_OUTPUT"
 
@@ -171,4 +182,10 @@ jobs:
             sleep "$((attempt * 5))"
           done
           echo "::error::git push to private failed after ${max_attempts} attempts."
+          exit 1
+
+      - name: Fail job if transcribe failed
+        if: steps.transcribe.outcome == 'failure'
+        run: |
+          echo "::error::Transcribe step failed. Partial transcripts may have been committed and pushed."
           exit 1

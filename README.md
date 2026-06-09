@@ -57,7 +57,8 @@ git push -u origin main
 
 | ファイル | Actions 名 |
 |----------|------------|
-| `transcribe-kinki.yml` | BIT pdf transcribe gemini |
-| `transcribe-chugoku.yml` | BIT pdf transcribe gemini (Chugoku) |
+| `pdf_transcribe_gemini.yml` | BIT pdf transcribe gemini |
+
+全ブロック（`01_hokkaido` 〜 `09_kyushu`）を 1 本の workflow で選択実行します。
 
 詳細: [docs/github-actions-secrets.md](../docs/github-actions-secrets.md)
