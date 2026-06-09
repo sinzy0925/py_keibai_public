@@ -1,5 +1,5 @@
 # public 鏡像用: 本体は private sinzy0925/py_keibai を checkout し、成果物は private のみに push
-name: BIT pdf transcribe gemini
+name: BIT pdf transcribe gemini 1
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ on:
           - 07_chugoku
           - 08_shikoku
           - 09_kyushu
-        default: 03_kanto
+        default: 01_hokkaido
       run_mode:
         description: "実行モード: normal=通常 / err_retry=エラーページのみ / force=全ページ再実行"
         type: choice
